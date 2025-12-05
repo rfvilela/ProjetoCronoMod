@@ -74,6 +74,18 @@ def load_from_file():
                 order_copy = order.copy()
                 order_copy['start_date'] = datetime.strptime(order['start_date'], '%Y-%m-%d')
                 order_copy['end_date'] = datetime.strptime(order['end_date'], '%Y-%m-%d')
+                
+                # Compatibilidade: se não tem 'items', cria um item genérico
+                if 'items' not in order_copy:
+                    order_copy['items'] = [{
+                        'part_name': 'Item Genérico',
+                        'part_ref': 'N/A',
+                        'quantity': 1,
+                        'time_per_unit': order_copy.get('total_minutes', 0),
+                        'total_time': order_copy.get('total_minutes', 0),
+                        'production_order': 'N/A'
+                    }]
+                
                 st.session_state.orders.append(order_copy)
             
             return True
@@ -87,16 +99,33 @@ def export_orders_to_csv():
     if st.session_state.orders:
         rows = []
         for idx, o in enumerate(st.session_state.orders):
-            for item in o['items']:
+            # Verifica se tem items (novo formato)
+            if 'items' in o and o['items']:
+                for item in o['items']:
+                    rows.append({
+                        'Prioridade': idx + 1,
+                        'Pedido': o['name'],
+                        'Peça': item['part_name'],
+                        'Referencia': item['part_ref'],
+                        'Quantidade': item['quantity'],
+                        'Min_Unitario': item['time_per_unit'],
+                        'Min_Total': item['total_time'],
+                        'Ordem_Producao': item['production_order'],
+                        'Data_Inicio': o['start_date'].strftime('%d/%m/%Y'),
+                        'Data_Fim': o['end_date'].strftime('%d/%m/%Y'),
+                        'Dias_Uteis': o['days_needed']
+                    })
+            else:
+                # Pedido antigo sem items
                 rows.append({
                     'Prioridade': idx + 1,
                     'Pedido': o['name'],
-                    'Peça': item['part_name'],
-                    'Referencia': item['part_ref'],
-                    'Quantidade': item['quantity'],
-                    'Min_Unitario': item['time_per_unit'],
-                    'Min_Total': item['total_time'],
-                    'Ordem_Producao': item['production_order'],
+                    'Peça': 'N/A',
+                    'Referencia': 'N/A',
+                    'Quantidade': 'N/A',
+                    'Min_Unitario': 'N/A',
+                    'Min_Total': o['total_minutes'],
+                    'Ordem_Producao': 'N/A',
                     'Data_Inicio': o['start_date'].strftime('%d/%m/%Y'),
                     'Data_Fim': o['end_date'].strftime('%d/%m/%Y'),
                     'Dias_Uteis': o['days_needed']
@@ -468,8 +497,13 @@ with tab1:
             # Lista de pedidos
             for idx, order in enumerate(st.session_state.orders):
                 with st.expander(f"#{idx+1} - {order['name']} | {order['start_date'].strftime('%d/%m/%Y')} a {order['end_date'].strftime('%d/%m/%Y')} ({order['days_needed']} dias)"):
-                    for item in order['items']:
-                        st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
+                    # Verifica se tem items (novo formato) ou exibe dados antigos
+                    if 'items' in order and order['items']:
+                        for item in order['items']:
+                            st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
+                    else:
+                        st.write(f"• Pedido antigo - Total: {order['total_minutes']} minutos")
+                    
                     st.write(f"**Total: {order['total_minutes']} minutos**")
                     
                     if st.button(f"🗑️ Remover Pedido", key=f"rem_{idx}"):

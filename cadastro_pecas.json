@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Calca",
+        "reference": "PROV-01",
+        "time_minutes": 5,
+        "production_order": "OP123"
+    },
+    {
+        "name": "BermudaCargo",
+        "reference": "PROV-02",
+        "time_minutes": 7,
+        "production_order": "OP124"
+    }
+]
