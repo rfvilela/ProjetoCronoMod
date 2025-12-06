@@ -344,7 +344,7 @@ with col_logo:
     # Você pode substituir este emoji pela imagem real
     st.markdown("""
         <div style="text-align: center; padding: 10px;">
-            <img src="https://i.imgur.com/u758BGN.png" 
+            <img src="https://i.imgur.com/your-image-url.png" 
                  alt="Logo" 
                  style="width: 80px; height: 80px; border-radius: 10px;"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -457,103 +457,103 @@ with tab1:
         else:
             col_name, col_date = st.columns([2, 1])
             
-            with col_name:
-                order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
+        with col_name:
+            order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
+        
+        with col_date:
+            # Campo para definir data de início personalizada
+            custom_start_date = st.date_input(
+                "📅 Data de Início",
+                value=calculate_next_available_date().date(),
+                help="Defina a data de início deste pedido"
+            )
+        
+        st.subheader("Adicionar Itens ao Pedido")
+        
+        # Usar session_state para armazenar itens temporários
+        if 'temp_items' not in st.session_state:
+            st.session_state.temp_items = []
+        
+        col1, col2, col3 = st.columns([3, 2, 1])
+        
+        with col1:
+            selected_part_idx = st.selectbox(
+                "Selecione a Peça",
+                range(len(st.session_state.parts)),
+                format_func=lambda x: f"{st.session_state.parts[x]['name']} (Ref: {st.session_state.parts[x]['reference']})"
+            )
+        
+        with col2:
+            quantity = st.number_input("Quantidade", min_value=1, value=1)
+        
+        with col3:
+            st.write("")
+            st.write("")
+            if st.button("➕ Adicionar Item"):
+                part = st.session_state.parts[selected_part_idx]
+                item = {
+                    'part_name': part['name'],
+                    'part_ref': part['reference'],
+                    'quantity': quantity,
+                    'time_per_unit': part['time_minutes'],
+                    'total_time': quantity * part['time_minutes'],
+                    'production_order': part['production_order']
+                }
+                st.session_state.temp_items.append(item)
+                st.rerun()
+        
+        # Mostrar itens adicionados
+        if st.session_state.temp_items:
+            st.write("**Itens do Pedido:**")
             
-            with col_date:
-                # Campo para definir data de início personalizada
-                custom_start_date = st.date_input(
-                    "📅 Data de Início",
-                    value=calculate_next_available_date().date(),
-                    help="Defina a data de início deste pedido"
-                )
-            
-            st.subheader("Adicionar Itens ao Pedido")
-            
-            # Usar session_state para armazenar itens temporários
-            if 'temp_items' not in st.session_state:
-                st.session_state.temp_items = []
-            
-            col1, col2, col3 = st.columns([3, 2, 1])
-            
-            with col1:
-                selected_part_idx = st.selectbox(
-                    "Selecione a Peça",
-                    range(len(st.session_state.parts)),
-                    format_func=lambda x: f"{st.session_state.parts[x]['name']} (Ref: {st.session_state.parts[x]['reference']})"
-                )
-            
-            with col2:
-                quantity = st.number_input("Quantidade", min_value=1, value=1)
-            
-            with col3:
-                st.write("")
-                st.write("")
-                if st.button("➕ Adicionar Item"):
-                    part = st.session_state.parts[selected_part_idx]
-                    item = {
-                        'part_name': part['name'],
-                        'part_ref': part['reference'],
-                        'quantity': quantity,
-                        'time_per_unit': part['time_minutes'],
-                        'total_time': quantity * part['time_minutes'],
-                        'production_order': part['production_order']
-                    }
-                    st.session_state.temp_items.append(item)
-                    st.rerun()
-            
-            # Mostrar itens adicionados
-            if st.session_state.temp_items:
-                st.write("**Itens do Pedido:**")
-                
-                for idx, item in enumerate(st.session_state.temp_items):
-                    col_a, col_b = st.columns([5, 1])
-                    with col_a:
-                        st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
-                    with col_b:
-                        if st.button("🗑️", key=f"del_{idx}"):
-                            st.session_state.temp_items.pop(idx)
-                            st.rerun()
-                
-                total_minutes = sum(item['total_time'] for item in st.session_state.temp_items)
-                st.info(f"⏱️ **Total do Pedido: {total_minutes} minutos ({total_minutes/60:.1f} horas)**")
-                
-                # Calcular data de término baseado na data customizada
-                start_datetime = datetime.combine(custom_start_date, datetime.min.time())
-                effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-                end_date, days_needed = calculate_end_date(
-                    start_datetime,
-                    total_minutes,
-                    st.session_state.workers,
-                    effective_minutes
-                )
-                
-                st.info(f"📅 **Início: {start_datetime.strftime('%d/%m/%Y')} | Fim: {end_date.strftime('%d/%m/%Y')} | Dias úteis: {days_needed}**")
-                
-                if st.button("✅ Finalizar e Adicionar Pedido", type="primary"):
-                    if not order_name:
-                        st.error("❌ Insira o nome do pedido!")
-                    else:
-                        order = {
-                            'id': len(st.session_state.orders) + 1,
-                            'name': order_name,
-                            'items': st.session_state.temp_items.copy(),
-                            'total_minutes': total_minutes,
-                            'start_date': start_datetime,
-                            'end_date': end_date,
-                            'days_needed': days_needed
-                        }
-                        
-                        st.session_state.orders.append(order)
-                        st.session_state.temp_items = []
-                        save_to_file()
-                        st.success(f"✅ Pedido '{order_name}' adicionado!")
+            for idx, item in enumerate(st.session_state.temp_items):
+                col_a, col_b = st.columns([5, 1])
+                with col_a:
+                    st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
+                with col_b:
+                    if st.button("🗑️", key=f"del_{idx}"):
+                        st.session_state.temp_items.pop(idx)
                         st.rerun()
             
-            st.markdown("---")
+            total_minutes = sum(item['total_time'] for item in st.session_state.temp_items)
+            st.info(f"⏱️ **Total do Pedido: {total_minutes} minutos ({total_minutes/60:.1f} horas)**")
+            
+            # Calcular data de término baseado na data customizada
+            start_datetime = datetime.combine(custom_start_date, datetime.min.time())
+            effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
+            end_date, days_needed = calculate_end_date(
+                start_datetime,
+                total_minutes,
+                st.session_state.workers,
+                effective_minutes
+            )
+            
+            st.info(f"📅 **Início: {start_datetime.strftime('%d/%m/%Y')} | Fim: {end_date.strftime('%d/%m/%Y')} | Dias úteis: {days_needed}**")
+            
+            if st.button("✅ Finalizar e Adicionar Pedido", type="primary"):
+                if not order_name:
+                    st.error("❌ Insira o nome do pedido!")
+                else:
+                    order = {
+                        'id': len(st.session_state.orders) + 1,
+                        'name': order_name,
+                        'items': st.session_state.temp_items.copy(),
+                        'total_minutes': total_minutes,
+                        'start_date': start_datetime,
+                        'end_date': end_date,
+                        'days_needed': days_needed
+                    }
+                    
+                    st.session_state.orders.append(order)
+                    st.session_state.temp_items = []
+                    save_to_file()
+                    st.success(f"✅ Pedido '{order_name}' adicionado!")
+                    st.rerun()
         
-        # Pedidos Cadastrados
-        if st.session_state.orders:
+        st.markdown("---")
+    
+    # Pedidos Cadastrados
+    if st.session_state.orders:
             st.header("📋 Pedidos Cadastrados")
             
             # Reordenação
