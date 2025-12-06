@@ -77,6 +77,32 @@
                     "production_order": "N/A"
                 }
             ]
+        },
+        {
+            "id": 5,
+            "name": "PedidoTeste123",
+            "items": [
+                {
+                    "part_name": "BermudaCargo",
+                    "part_ref": "PROV-02",
+                    "quantity": 900,
+                    "time_per_unit": 7,
+                    "total_time": 6300,
+                    "production_order": "OP124"
+                },
+                {
+                    "part_name": "Calca",
+                    "part_ref": "PROV-01",
+                    "quantity": 300,
+                    "time_per_unit": 5,
+                    "total_time": 1500,
+                    "production_order": "OP123"
+                }
+            ],
+            "total_minutes": 7800,
+            "start_date": "2026-01-05",
+            "end_date": "2026-01-06",
+            "days_needed": 1
         }
     ]
 }

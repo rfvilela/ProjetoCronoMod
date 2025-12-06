@@ -337,8 +337,77 @@ def create_month_calendar(month_date, orders):
     html += '</table></div>'
     return html
 
-# Título principal
-st.title("📦 Sistema de Agendamento de Produção")
+# Cabeçalho com logo
+col_logo, col_title = st.columns([1, 5])
+
+with col_logo:
+    # Você pode substituir este emoji pela imagem real
+    st.markdown("""
+        <div style="text-align: center; padding: 10px;">
+            <img src="https://i.imgur.com/your-image-url.png" 
+                 alt="Logo" 
+                 style="width: 80px; height: 80px; border-radius: 10px;"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; font-size: 60px;">📦</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_title:
+    st.markdown("""
+        <div style="padding-top: 15px;">
+            <h1 style="margin: 0; color: #1f77b4;">Sistema de Agendamento de Produção</h1>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 16px;">Gestão Inteligente de Pedidos e Produção</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("---")
+
+# Estilo customizado para as abas
+st.markdown("""
+    <style>
+    /* Estilo das abas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: white;
+        border-radius: 8px;
+        padding: 0 24px;
+        font-weight: 500;
+        border: 2px solid #e0e0e0;
+        transition: all 0.3s;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e3f2fd;
+        border-color: #2196f3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #1f77b4 !important;
+        color: white !important;
+        border-color: #1f77b4 !important;
+        box-shadow: 0 4px 12px rgba(31,119,180,0.3);
+    }
+    
+    /* Ícones das abas */
+    .stTabs [data-baseweb="tab"] svg {
+        margin-right: 8px;
+    }
+    
+    /* Conteúdo das abas */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Abas principais
 tab1, tab2, tab3, tab4 = st.tabs(["🏭 Produção", "🔧 Cadastro de Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
@@ -651,4 +720,144 @@ with tab2:
             part = {
                 'name': part_name,
                 'reference': part_ref,
-                'time_minutes': part_time
+                'time_minutes': part_time,
+                'production_order': part_order
+            }
+            st.session_state.parts.append(part)
+            save_parts_to_file()
+            st.success(f"✅ Peça '{part_name}' cadastrada!")
+            st.rerun()
+    
+    st.markdown("---")
+    
+    if st.session_state.parts:
+        st.subheader("Peças Cadastradas")
+        
+        df_parts = pd.DataFrame(st.session_state.parts)
+        st.dataframe(df_parts, use_container_width=True, hide_index=True)
+        
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            part_to_remove = st.selectbox(
+                "Remover:",
+                range(len(st.session_state.parts)),
+                format_func=lambda x: st.session_state.parts[x]['reference']
+            )
+        with col2:
+            if st.button("🗑️ Remover Peça"):
+                st.session_state.parts.pop(part_to_remove)
+                save_parts_to_file()
+                st.success("✅ Peça removida!")
+                st.rerun()
+    else:
+        st.info("📦 Nenhuma peça cadastrada ainda.")
+
+# ===== ABA 3: DIAS BLOQUEADOS =====
+with tab3:
+    st.header("📅 Cadastro de Dias Bloqueados (Feriados/Paradas)")
+    
+    st.info("💡 Dias bloqueados não serão considerados como dias úteis nos cálculos de produção.")
+    
+    st.subheader("Adicionar Dia Bloqueado")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        blocked_date = st.date_input(
+            "Selecione a data",
+            value=datetime.now().date(),
+            help="Data que será bloqueada (feriado, manutenção, etc.)"
+        )
+    
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("🚫 Bloquear Data", type="primary"):
+            if blocked_date not in st.session_state.blocked_days:
+                st.session_state.blocked_days.append(blocked_date)
+                st.session_state.blocked_days.sort()
+                save_blocked_days()
+                # Recalcular datas dos pedidos
+                if st.session_state.orders:
+                    first_start = st.session_state.orders[0]['start_date']
+                    recalculate_all_dates(first_start)
+                    save_to_file()
+                st.success(f"✅ Data {blocked_date.strftime('%d/%m/%Y')} bloqueada!")
+                st.rerun()
+            else:
+                st.warning("⚠️ Esta data já está bloqueada!")
+    
+    st.markdown("---")
+    
+    if st.session_state.blocked_days:
+        st.subheader("Dias Bloqueados Cadastrados")
+        
+        blocked_df = pd.DataFrame([{
+            'Data': d.strftime('%d/%m/%Y'),
+            'Dia da Semana': ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][d.weekday()]
+        } for d in sorted(st.session_state.blocked_days)])
+        
+        st.dataframe(blocked_df, use_container_width=True, hide_index=True)
+        
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            date_to_remove = st.selectbox(
+                "Desbloquear:",
+                range(len(st.session_state.blocked_days)),
+                format_func=lambda x: st.session_state.blocked_days[x].strftime('%d/%m/%Y')
+            )
+        with col2:
+            if st.button("✅ Desbloquear Data"):
+                removed_date = st.session_state.blocked_days.pop(date_to_remove)
+                save_blocked_days()
+                # Recalcular datas dos pedidos
+                if st.session_state.orders:
+                    first_start = st.session_state.orders[0]['start_date']
+                    recalculate_all_dates(first_start)
+                    save_to_file()
+                st.success(f"✅ Data {removed_date.strftime('%d/%m/%Y')} desbloqueada!")
+                st.rerun()
+    else:
+        st.info("📅 Nenhum dia bloqueado cadastrado ainda.")
+
+# ===== ABA 4: RELATÓRIOS =====
+with tab4:
+    st.header("📊 Relatórios e Exportações")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📥 Exportar Pedidos")
+        csv_orders = export_orders_to_csv()
+        if csv_orders:
+            st.download_button(
+                "📥 Download Pedidos (CSV)",
+                csv_orders,
+                f"pedidos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                "text/csv"
+            )
+        else:
+            st.info("Nenhum pedido para exportar")
+    
+    with col2:
+        st.subheader("📥 Exportar Peças")
+        csv_parts = export_parts_to_csv()
+        if csv_parts:
+            st.download_button(
+                "📥 Download Peças (CSV)",
+                csv_parts,
+                f"pecas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                "text/csv"
+            )
+        else:
+            st.info("Nenhuma peça para exportar")
+
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: gray;'>
+        <p>Sistema de Agendamento de Produção v6.0 🚀</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
