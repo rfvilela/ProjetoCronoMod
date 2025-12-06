@@ -344,7 +344,7 @@ with col_logo:
     # Você pode substituir este emoji pela imagem real
     st.markdown("""
         <div style="text-align: center; padding: 10px;">
-            <img src="https://i.imgur.com/u758BGN.png" 
+            <img src="https://i.imgur.com/your-image-url.png" 
                  alt="Logo" 
                  style="width: 80px; height: 80px; border-radius: 10px;"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -410,9 +410,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Abas principais
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏭 Pedidos", "⚙️ Configuração", "🔧 Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏭 Produção", "🔧 Cadastro de Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
 
-# ===== ABA 1: PEDIDOS =====
+# ===== ABA 1: PRODUÇÃO =====
 with tab1:
     # Barra de informações
     col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
@@ -436,124 +436,162 @@ with tab1:
     
     st.markdown("---")
     
-    # Verificar se a configuração foi feita
+    # Configuração
+    st.header("⚙️ Configuração da Capacidade de Produção")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        workers_input = st.number_input(
+            "👥 Trabalhadores",
+            min_value=1,
+            value=st.session_state.workers if st.session_state.workers else 1,
+            disabled=st.session_state.config_saved
+        )
+    
+    with col2:
+        minutes_input = st.number_input(
+            "⏱️ Min/Dia (por trabalhador)",
+            min_value=1,
+            value=st.session_state.minutes_per_day if st.session_state.minutes_per_day else 480,
+            disabled=st.session_state.config_saved
+        )
+    
+    with col3:
+        efficiency_input = st.number_input(
+            "📊 Eficiência (%)",
+            min_value=1,
+            max_value=100,
+            value=st.session_state.efficiency if st.session_state.efficiency else 100,
+            disabled=st.session_state.config_saved
+        )
+    
     if not st.session_state.config_saved:
-        st.warning("⚠️ Configure a capacidade de produção primeiro na aba '⚙️ Configuração'!")
-        st.stop()
-    
-    # Mostrar configuração atual
-    effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-    effective_capacity = st.session_state.workers * effective_minutes
-    
-    st.info(f"⚙️ **Capacidade configurada:** {st.session_state.workers} trabalhadores × {st.session_state.minutes_per_day} min/dia × {st.session_state.efficiency}% = **{effective_capacity:.0f} min/dia efetivos** ({effective_capacity/60:.1f}h/dia)")
+        if st.button("💾 Salvar Configuração", type="primary"):
+            st.session_state.workers = workers_input
+            st.session_state.minutes_per_day = minutes_input
+            st.session_state.efficiency = efficiency_input
+            st.session_state.config_saved = True
+            save_to_file()
+            st.rerun()
+    else:
+        effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
+        effective_capacity = st.session_state.workers * effective_minutes
+        
+        st.success(f"✅ Capacidade: {effective_capacity:.0f} min/dia efetivos ({effective_capacity/60:.1f}h/dia)")
+        
+        if st.button("✏️ Editar Configuração"):
+            st.session_state.config_saved = False
+            st.rerun()
     
     st.markdown("---")
     
     # Cadastro de Pedidos
-    st.header("📦 Cadastrar Novo Pedido")
+    if st.session_state.config_saved:
+        st.header("📦 Cadastrar Novo Pedido")
         
         if not st.session_state.parts:
             st.warning("⚠️ Cadastre peças primeiro na aba 'Cadastro de Peças'!")
         else:
             col_name, col_date = st.columns([2, 1])
             
-        with col_name:
-            order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
-        
-        with col_date:
-            # Campo para definir data de início personalizada
-            custom_start_date = st.date_input(
-                "📅 Data de Início",
-                value=calculate_next_available_date().date(),
-                help="Defina a data de início deste pedido"
-            )
-        
-        st.subheader("Adicionar Itens ao Pedido")
-        
-        # Usar session_state para armazenar itens temporários
-        if 'temp_items' not in st.session_state:
-            st.session_state.temp_items = []
-        
-        col1, col2, col3 = st.columns([3, 2, 1])
-        
-        with col1:
-            selected_part_idx = st.selectbox(
-                "Selecione a Peça",
-                range(len(st.session_state.parts)),
-                format_func=lambda x: f"{st.session_state.parts[x]['name']} (Ref: {st.session_state.parts[x]['reference']})"
-            )
-        
-        with col2:
-            quantity = st.number_input("Quantidade", min_value=1, value=1)
-        
-        with col3:
-            st.write("")
-            st.write("")
-            if st.button("➕ Adicionar Item"):
-                part = st.session_state.parts[selected_part_idx]
-                item = {
-                    'part_name': part['name'],
-                    'part_ref': part['reference'],
-                    'quantity': quantity,
-                    'time_per_unit': part['time_minutes'],
-                    'total_time': quantity * part['time_minutes'],
-                    'production_order': part['production_order']
-                }
-                st.session_state.temp_items.append(item)
-                st.rerun()
-        
-        # Mostrar itens adicionados
-        if st.session_state.temp_items:
-            st.write("**Itens do Pedido:**")
+            with col_name:
+                order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
             
-            for idx, item in enumerate(st.session_state.temp_items):
-                col_a, col_b = st.columns([5, 1])
-                with col_a:
-                    st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
-                with col_b:
-                    if st.button("🗑️", key=f"del_{idx}"):
-                        st.session_state.temp_items.pop(idx)
+            with col_date:
+                # Campo para definir data de início personalizada
+                custom_start_date = st.date_input(
+                    "📅 Data de Início",
+                    value=calculate_next_available_date().date(),
+                    help="Defina a data de início deste pedido"
+                )
+            
+            st.subheader("Adicionar Itens ao Pedido")
+            
+            # Usar session_state para armazenar itens temporários
+            if 'temp_items' not in st.session_state:
+                st.session_state.temp_items = []
+            
+            col1, col2, col3 = st.columns([3, 2, 1])
+            
+            with col1:
+                selected_part_idx = st.selectbox(
+                    "Selecione a Peça",
+                    range(len(st.session_state.parts)),
+                    format_func=lambda x: f"{st.session_state.parts[x]['name']} (Ref: {st.session_state.parts[x]['reference']})"
+                )
+            
+            with col2:
+                quantity = st.number_input("Quantidade", min_value=1, value=1)
+            
+            with col3:
+                st.write("")
+                st.write("")
+                if st.button("➕ Adicionar Item"):
+                    part = st.session_state.parts[selected_part_idx]
+                    item = {
+                        'part_name': part['name'],
+                        'part_ref': part['reference'],
+                        'quantity': quantity,
+                        'time_per_unit': part['time_minutes'],
+                        'total_time': quantity * part['time_minutes'],
+                        'production_order': part['production_order']
+                    }
+                    st.session_state.temp_items.append(item)
+                    st.rerun()
+            
+            # Mostrar itens adicionados
+            if st.session_state.temp_items:
+                st.write("**Itens do Pedido:**")
+                
+                for idx, item in enumerate(st.session_state.temp_items):
+                    col_a, col_b = st.columns([5, 1])
+                    with col_a:
+                        st.write(f"• {item['part_name']} (Ref: {item['part_ref']}) - Qtd: {item['quantity']} - {item['total_time']} min - OP: {item['production_order']}")
+                    with col_b:
+                        if st.button("🗑️", key=f"del_{idx}"):
+                            st.session_state.temp_items.pop(idx)
+                            st.rerun()
+                
+                total_minutes = sum(item['total_time'] for item in st.session_state.temp_items)
+                st.info(f"⏱️ **Total do Pedido: {total_minutes} minutos ({total_minutes/60:.1f} horas)**")
+                
+                # Calcular data de término baseado na data customizada
+                start_datetime = datetime.combine(custom_start_date, datetime.min.time())
+                effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
+                end_date, days_needed = calculate_end_date(
+                    start_datetime,
+                    total_minutes,
+                    st.session_state.workers,
+                    effective_minutes
+                )
+                
+                st.info(f"📅 **Início: {start_datetime.strftime('%d/%m/%Y')} | Fim: {end_date.strftime('%d/%m/%Y')} | Dias úteis: {days_needed}**")
+                
+                if st.button("✅ Finalizar e Adicionar Pedido", type="primary"):
+                    if not order_name:
+                        st.error("❌ Insira o nome do pedido!")
+                    else:
+                        order = {
+                            'id': len(st.session_state.orders) + 1,
+                            'name': order_name,
+                            'items': st.session_state.temp_items.copy(),
+                            'total_minutes': total_minutes,
+                            'start_date': start_datetime,
+                            'end_date': end_date,
+                            'days_needed': days_needed
+                        }
+                        
+                        st.session_state.orders.append(order)
+                        st.session_state.temp_items = []
+                        save_to_file()
+                        st.success(f"✅ Pedido '{order_name}' adicionado!")
                         st.rerun()
             
-            total_minutes = sum(item['total_time'] for item in st.session_state.temp_items)
-            st.info(f"⏱️ **Total do Pedido: {total_minutes} minutos ({total_minutes/60:.1f} horas)**")
-            
-            # Calcular data de término baseado na data customizada
-            start_datetime = datetime.combine(custom_start_date, datetime.min.time())
-            effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-            end_date, days_needed = calculate_end_date(
-                start_datetime,
-                total_minutes,
-                st.session_state.workers,
-                effective_minutes
-            )
-            
-            st.info(f"📅 **Início: {start_datetime.strftime('%d/%m/%Y')} | Fim: {end_date.strftime('%d/%m/%Y')} | Dias úteis: {days_needed}**")
-            
-            if st.button("✅ Finalizar e Adicionar Pedido", type="primary"):
-                if not order_name:
-                    st.error("❌ Insira o nome do pedido!")
-                else:
-                    order = {
-                        'id': len(st.session_state.orders) + 1,
-                        'name': order_name,
-                        'items': st.session_state.temp_items.copy(),
-                        'total_minutes': total_minutes,
-                        'start_date': start_datetime,
-                        'end_date': end_date,
-                        'days_needed': days_needed
-                    }
-                    
-                    st.session_state.orders.append(order)
-                    st.session_state.temp_items = []
-                    save_to_file()
-                    st.success(f"✅ Pedido '{order_name}' adicionado!")
-                    st.rerun()
+            st.markdown("---")
         
-        st.markdown("---")
-    
-    # Pedidos Cadastrados
-    if st.session_state.orders:
+        # Pedidos Cadastrados
+        if st.session_state.orders:
             st.header("📋 Pedidos Cadastrados")
             
             # Reordenação
@@ -655,104 +693,8 @@ with tab1:
             for month_date in months:
                 st.markdown(create_month_calendar(month_date, st.session_state.orders), unsafe_allow_html=True)
 
-# ===== ABA 2: CONFIGURAÇÃO =====
+# ===== ABA 2: CADASTRO DE PEÇAS =====
 with tab2:
-    st.header("⚙️ Configuração da Capacidade de Produção")
-    
-    st.info("💡 Configure a capacidade de produção da sua fábrica. Esta configuração será usada para calcular os prazos de todos os pedidos.")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        workers_input = st.number_input(
-            "👥 Número de Trabalhadores",
-            min_value=1,
-            value=st.session_state.workers if st.session_state.workers else 1,
-            disabled=st.session_state.config_saved,
-            help="Quantos trabalhadores estão disponíveis para produção"
-        )
-    
-    with col2:
-        minutes_input = st.number_input(
-            "⏱️ Minutos por Dia (por trabalhador)",
-            min_value=1,
-            value=st.session_state.minutes_per_day if st.session_state.minutes_per_day else 480,
-            disabled=st.session_state.config_saved,
-            help="Quanto tempo cada trabalhador trabalha por dia (ex: 480 min = 8 horas)"
-        )
-    
-    with col3:
-        efficiency_input = st.number_input(
-            "📊 Eficiência da Fábrica (%)",
-            min_value=1,
-            max_value=100,
-            value=st.session_state.efficiency if st.session_state.efficiency else 100,
-            disabled=st.session_state.config_saved,
-            help="Eficiência real considerando pausas, setup, perdas (ex: 85%)"
-        )
-    
-    st.markdown("---")
-    
-    # Cálculo em tempo real
-    if workers_input and minutes_input and efficiency_input:
-        effective_minutes = minutes_input * (efficiency_input / 100)
-        nominal_capacity = workers_input * minutes_input
-        effective_capacity = workers_input * effective_minutes
-        
-        st.subheader("📊 Capacidade Calculada")
-        
-        col_calc1, col_calc2, col_calc3 = st.columns(3)
-        
-        with col_calc1:
-            st.metric(
-                "💪 Capacidade Nominal",
-                f"{nominal_capacity:.0f} min/dia",
-                f"{nominal_capacity/60:.1f} horas/dia"
-            )
-        
-        with col_calc2:
-            st.metric(
-                "⚡ Capacidade Efetiva",
-                f"{effective_capacity:.0f} min/dia",
-                f"{effective_capacity/60:.1f} horas/dia"
-            )
-        
-        with col_calc3:
-            st.metric(
-                "📈 Minutos Efetivos",
-                f"{effective_minutes:.0f} min",
-                "por trabalhador/dia"
-            )
-        
-        st.info(f"📌 **Resumo:** Com {workers_input} trabalhadores trabalhando {minutes_input} minutos/dia cada, a uma eficiência de {efficiency_input}%, sua fábrica produz efetivamente **{effective_capacity:.0f} minutos por dia**.")
-    
-    st.markdown("---")
-    
-    # Botões de ação
-    if not st.session_state.config_saved:
-        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
-        with col_btn1:
-            if st.button("💾 Salvar Configuração", type="primary", use_container_width=True):
-                st.session_state.workers = workers_input
-                st.session_state.minutes_per_day = minutes_input
-                st.session_state.efficiency = efficiency_input
-                st.session_state.config_saved = True
-                save_to_file()
-                st.success("✅ Configuração salva com sucesso!")
-                st.rerun()
-    else:
-        st.success("✅ Configuração salva e ativa!")
-        
-        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
-        with col_btn1:
-            if st.button("✏️ Editar Configuração", use_container_width=True):
-                if st.session_state.orders:
-                    st.warning("⚠️ Atenção: Editar a configuração pode afetar os prazos dos pedidos existentes.")
-                st.session_state.config_saved = False
-                st.rerun()
-
-# ===== ABA 3: CADASTRO DE PEÇAS =====
-with tab3:
     st.header("🔧 Cadastro de Peças")
     
     st.subheader("Adicionar Nova Peça")
@@ -810,8 +752,8 @@ with tab3:
     else:
         st.info("📦 Nenhuma peça cadastrada ainda.")
 
-# ===== ABA 4: DIAS BLOQUEADOS =====
-with tab4:
+# ===== ABA 3: DIAS BLOQUEADOS =====
+with tab3:
     st.header("📅 Cadastro de Dias Bloqueados (Feriados/Paradas)")
     
     st.info("💡 Dias bloqueados não serão considerados como dias úteis nos cálculos de produção.")
@@ -878,8 +820,8 @@ with tab4:
     else:
         st.info("📅 Nenhum dia bloqueado cadastrado ainda.")
 
-# ===== ABA 5: RELATÓRIOS =====
-with tab5:
+# ===== ABA 4: RELATÓRIOS =====
+with tab4:
     st.header("📊 Relatórios e Exportações")
     
     col1, col2 = st.columns(2)

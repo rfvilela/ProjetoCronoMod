@@ -10,5 +10,11 @@
         "reference": "PROV-02",
         "time_minutes": 7,
         "production_order": "OP124"
+    },
+    {
+        "name": "BermudaVoley",
+        "reference": "PROV-03",
+        "time_minutes": 22,
+        "production_order": "OP125"
     }
 ]

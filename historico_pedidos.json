@@ -25,60 +25,6 @@
             ]
         },
         {
-            "id": 4,
-            "name": "PedidoDistintoBermudas",
-            "items": [
-                {
-                    "part_name": "Calca",
-                    "part_ref": "PROV-01",
-                    "quantity": 500,
-                    "time_per_unit": 5,
-                    "total_time": 2500,
-                    "production_order": "OP123"
-                }
-            ],
-            "total_minutes": 2500,
-            "start_date": "2025-12-09",
-            "end_date": "2025-12-10",
-            "days_needed": 1
-        },
-        {
-            "id": 2,
-            "name": "Pedido Insider",
-            "total_minutes": 2000,
-            "start_date": "2025-12-11",
-            "end_date": "2025-12-12",
-            "days_needed": 1,
-            "items": [
-                {
-                    "part_name": "Item Genérico",
-                    "part_ref": "N/A",
-                    "quantity": 1,
-                    "time_per_unit": 2000,
-                    "total_time": 2000,
-                    "production_order": "N/A"
-                }
-            ]
-        },
-        {
-            "id": 3,
-            "name": "Pedido Nick",
-            "total_minutes": 50000,
-            "start_date": "2025-12-15",
-            "end_date": "2025-12-22",
-            "days_needed": 5,
-            "items": [
-                {
-                    "part_name": "Item Genérico",
-                    "part_ref": "N/A",
-                    "quantity": 1,
-                    "time_per_unit": 50000,
-                    "total_time": 50000,
-                    "production_order": "N/A"
-                }
-            ]
-        },
-        {
             "id": 5,
             "name": "PedidoTeste123",
             "items": [
@@ -100,9 +46,81 @@
                 }
             ],
             "total_minutes": 7800,
-            "start_date": "2026-01-05",
-            "end_date": "2026-01-06",
+            "start_date": "2025-12-09",
+            "end_date": "2025-12-10",
             "days_needed": 1
+        },
+        {
+            "id": 4,
+            "name": "PedidoDistintoBermudas",
+            "items": [
+                {
+                    "part_name": "Calca",
+                    "part_ref": "PROV-01",
+                    "quantity": 500,
+                    "time_per_unit": 5,
+                    "total_time": 2500,
+                    "production_order": "OP123"
+                }
+            ],
+            "total_minutes": 2500,
+            "start_date": "2025-12-11",
+            "end_date": "2025-12-12",
+            "days_needed": 1
+        },
+        {
+            "id": 2,
+            "name": "Pedido Insider",
+            "total_minutes": 2000,
+            "start_date": "2025-12-15",
+            "end_date": "2025-12-16",
+            "days_needed": 1,
+            "items": [
+                {
+                    "part_name": "Item Genérico",
+                    "part_ref": "N/A",
+                    "quantity": 1,
+                    "time_per_unit": 2000,
+                    "total_time": 2000,
+                    "production_order": "N/A"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "name": "Pedido Nick",
+            "total_minutes": 50000,
+            "start_date": "2025-12-17",
+            "end_date": "2025-12-24",
+            "days_needed": 5,
+            "items": [
+                {
+                    "part_name": "Item Genérico",
+                    "part_ref": "N/A",
+                    "quantity": 1,
+                    "time_per_unit": 50000,
+                    "total_time": 50000,
+                    "production_order": "N/A"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "name": "PedidoLacoste",
+            "items": [
+                {
+                    "part_name": "BermudaVoley",
+                    "part_ref": "PROV-03",
+                    "quantity": 5000,
+                    "time_per_unit": 22,
+                    "total_time": 110000,
+                    "production_order": "OP125"
+                }
+            ],
+            "total_minutes": 110000,
+            "start_date": "2025-12-26",
+            "end_date": "2026-01-13",
+            "days_needed": 10
         }
     ]
 }
