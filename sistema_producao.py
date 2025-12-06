@@ -410,9 +410,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Abas principais
-tab1, tab2, tab3, tab4 = st.tabs(["🏭 Produção", "🔧 Cadastro de Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏭 Pedidos", "⚙️ Configuração", "🔧 Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
 
-# ===== ABA 1: PRODUÇÃO =====
+# ===== ABA 1: PEDIDOS =====
 with tab1:
     # Barra de informações
     col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
@@ -436,59 +436,21 @@ with tab1:
     
     st.markdown("---")
     
-    # Configuração
-    st.header("⚙️ Configuração da Capacidade de Produção")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        workers_input = st.number_input(
-            "👥 Trabalhadores",
-            min_value=1,
-            value=st.session_state.workers if st.session_state.workers else 1,
-            disabled=st.session_state.config_saved
-        )
-    
-    with col2:
-        minutes_input = st.number_input(
-            "⏱️ Min/Dia (por trabalhador)",
-            min_value=1,
-            value=st.session_state.minutes_per_day if st.session_state.minutes_per_day else 480,
-            disabled=st.session_state.config_saved
-        )
-    
-    with col3:
-        efficiency_input = st.number_input(
-            "📊 Eficiência (%)",
-            min_value=1,
-            max_value=100,
-            value=st.session_state.efficiency if st.session_state.efficiency else 100,
-            disabled=st.session_state.config_saved
-        )
-    
+    # Verificar se a configuração foi feita
     if not st.session_state.config_saved:
-        if st.button("💾 Salvar Configuração", type="primary"):
-            st.session_state.workers = workers_input
-            st.session_state.minutes_per_day = minutes_input
-            st.session_state.efficiency = efficiency_input
-            st.session_state.config_saved = True
-            save_to_file()
-            st.rerun()
-    else:
-        effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-        effective_capacity = st.session_state.workers * effective_minutes
-        
-        st.success(f"✅ Capacidade: {effective_capacity:.0f} min/dia efetivos ({effective_capacity/60:.1f}h/dia)")
-        
-        if st.button("✏️ Editar Configuração"):
-            st.session_state.config_saved = False
-            st.rerun()
+        st.warning("⚠️ Configure a capacidade de produção primeiro na aba '⚙️ Configuração'!")
+        st.stop()
+    
+    # Mostrar configuração atual
+    effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
+    effective_capacity = st.session_state.workers * effective_minutes
+    
+    st.info(f"⚙️ **Capacidade configurada:** {st.session_state.workers} trabalhadores × {st.session_state.minutes_per_day} min/dia × {st.session_state.efficiency}% = **{effective_capacity:.0f} min/dia efetivos** ({effective_capacity/60:.1f}h/dia)")
     
     st.markdown("---")
     
     # Cadastro de Pedidos
-    if st.session_state.config_saved:
-        st.header("📦 Cadastrar Novo Pedido")
+    st.header("📦 Cadastrar Novo Pedido")
         
         if not st.session_state.parts:
             st.warning("⚠️ Cadastre peças primeiro na aba 'Cadastro de Peças'!")
@@ -693,8 +655,104 @@ with tab1:
             for month_date in months:
                 st.markdown(create_month_calendar(month_date, st.session_state.orders), unsafe_allow_html=True)
 
-# ===== ABA 2: CADASTRO DE PEÇAS =====
+# ===== ABA 2: CONFIGURAÇÃO =====
 with tab2:
+    st.header("⚙️ Configuração da Capacidade de Produção")
+    
+    st.info("💡 Configure a capacidade de produção da sua fábrica. Esta configuração será usada para calcular os prazos de todos os pedidos.")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        workers_input = st.number_input(
+            "👥 Número de Trabalhadores",
+            min_value=1,
+            value=st.session_state.workers if st.session_state.workers else 1,
+            disabled=st.session_state.config_saved,
+            help="Quantos trabalhadores estão disponíveis para produção"
+        )
+    
+    with col2:
+        minutes_input = st.number_input(
+            "⏱️ Minutos por Dia (por trabalhador)",
+            min_value=1,
+            value=st.session_state.minutes_per_day if st.session_state.minutes_per_day else 480,
+            disabled=st.session_state.config_saved,
+            help="Quanto tempo cada trabalhador trabalha por dia (ex: 480 min = 8 horas)"
+        )
+    
+    with col3:
+        efficiency_input = st.number_input(
+            "📊 Eficiência da Fábrica (%)",
+            min_value=1,
+            max_value=100,
+            value=st.session_state.efficiency if st.session_state.efficiency else 100,
+            disabled=st.session_state.config_saved,
+            help="Eficiência real considerando pausas, setup, perdas (ex: 85%)"
+        )
+    
+    st.markdown("---")
+    
+    # Cálculo em tempo real
+    if workers_input and minutes_input and efficiency_input:
+        effective_minutes = minutes_input * (efficiency_input / 100)
+        nominal_capacity = workers_input * minutes_input
+        effective_capacity = workers_input * effective_minutes
+        
+        st.subheader("📊 Capacidade Calculada")
+        
+        col_calc1, col_calc2, col_calc3 = st.columns(3)
+        
+        with col_calc1:
+            st.metric(
+                "💪 Capacidade Nominal",
+                f"{nominal_capacity:.0f} min/dia",
+                f"{nominal_capacity/60:.1f} horas/dia"
+            )
+        
+        with col_calc2:
+            st.metric(
+                "⚡ Capacidade Efetiva",
+                f"{effective_capacity:.0f} min/dia",
+                f"{effective_capacity/60:.1f} horas/dia"
+            )
+        
+        with col_calc3:
+            st.metric(
+                "📈 Minutos Efetivos",
+                f"{effective_minutes:.0f} min",
+                "por trabalhador/dia"
+            )
+        
+        st.info(f"📌 **Resumo:** Com {workers_input} trabalhadores trabalhando {minutes_input} minutos/dia cada, a uma eficiência de {efficiency_input}%, sua fábrica produz efetivamente **{effective_capacity:.0f} minutos por dia**.")
+    
+    st.markdown("---")
+    
+    # Botões de ação
+    if not st.session_state.config_saved:
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
+        with col_btn1:
+            if st.button("💾 Salvar Configuração", type="primary", use_container_width=True):
+                st.session_state.workers = workers_input
+                st.session_state.minutes_per_day = minutes_input
+                st.session_state.efficiency = efficiency_input
+                st.session_state.config_saved = True
+                save_to_file()
+                st.success("✅ Configuração salva com sucesso!")
+                st.rerun()
+    else:
+        st.success("✅ Configuração salva e ativa!")
+        
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 3])
+        with col_btn1:
+            if st.button("✏️ Editar Configuração", use_container_width=True):
+                if st.session_state.orders:
+                    st.warning("⚠️ Atenção: Editar a configuração pode afetar os prazos dos pedidos existentes.")
+                st.session_state.config_saved = False
+                st.rerun()
+
+# ===== ABA 3: CADASTRO DE PEÇAS =====
+with tab3:
     st.header("🔧 Cadastro de Peças")
     
     st.subheader("Adicionar Nova Peça")
@@ -752,8 +810,8 @@ with tab2:
     else:
         st.info("📦 Nenhuma peça cadastrada ainda.")
 
-# ===== ABA 3: DIAS BLOQUEADOS =====
-with tab3:
+# ===== ABA 4: DIAS BLOQUEADOS =====
+with tab4:
     st.header("📅 Cadastro de Dias Bloqueados (Feriados/Paradas)")
     
     st.info("💡 Dias bloqueados não serão considerados como dias úteis nos cálculos de produção.")
@@ -820,8 +878,8 @@ with tab3:
     else:
         st.info("📅 Nenhum dia bloqueado cadastrado ainda.")
 
-# ===== ABA 4: RELATÓRIOS =====
-with tab4:
+# ===== ABA 5: RELATÓRIOS =====
+with tab5:
     st.header("📊 Relatórios e Exportações")
     
     col1, col2 = st.columns(2)
