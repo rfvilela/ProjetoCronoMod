@@ -344,7 +344,7 @@ with col_logo:
     # Você pode substituir este emoji pela imagem real
     st.markdown("""
         <div style="text-align: center; padding: 10px;">
-            <img src="https://i.imgur.com/your-image-url.png" 
+            <img src="https://i.imgur.com/u758BGN.png" 
                  alt="Logo" 
                  style="width: 80px; height: 80px; border-radius: 10px;"
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
