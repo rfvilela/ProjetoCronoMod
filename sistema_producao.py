@@ -15,6 +15,34 @@ st.set_page_config(
 # Nomes dos arquivos
 HISTORY_FILE = "historico_pedidos.json"
 PARTS_FILE = "cadastro_pecas.json"
+BLOCKED_DAYS_FILE = "dias_bloqueados.json"
+
+def save_blocked_days():
+    """Salva dias bloqueados em arquivo JSON"""
+    blocked_dates = [d.strftime('%Y-%m-%d') for d in st.session_state.blocked_days]
+    with open(BLOCKED_DAYS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(blocked_dates, f, indent=4)
+
+def load_blocked_days():
+    """Carrega dias bloqueados do arquivo JSON"""
+    if os.path.exists(BLOCKED_DAYS_FILE):
+        try:
+            with open(BLOCKED_DAYS_FILE, 'r', encoding='utf-8') as f:
+                blocked_dates = json.load(f)
+            st.session_state.blocked_days = [datetime.strptime(d, '%Y-%m-%d').date() for d in blocked_dates]
+            return True
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar dias bloqueados: {str(e)}")
+            return False
+    return False
+
+def is_working_day(date):
+    """Verifica se é um dia útil (não é fim de semana nem está bloqueado)"""
+    if date.weekday() >= 5:  # Sábado ou Domingo
+        return False
+    if date.date() in st.session_state.blocked_days:
+        return False
+    return True
 
 def save_parts_to_file():
     """Salva cadastro de peças em arquivo JSON"""
@@ -142,16 +170,20 @@ def export_parts_to_csv():
         return df.to_csv(index=False, encoding='utf-8')
     return None
 
-def recalculate_all_dates():
+def recalculate_all_dates(start_date=None):
     """Recalcula todas as datas dos pedidos baseado na ordem atual"""
     if not st.session_state.orders or not st.session_state.config_saved:
         return
     
     effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-    current_date = datetime.now()
+    
+    if start_date is None:
+        current_date = datetime.now()
+    else:
+        current_date = start_date
     
     # Avançar para o próximo dia útil
-    while current_date.weekday() >= 5:
+    while not is_working_day(current_date):
         current_date += timedelta(days=1)
     
     for order in st.session_state.orders:
@@ -171,10 +203,14 @@ def recalculate_all_dates():
         
         # Próximo pedido começa no dia útil seguinte
         current_date = end_date + timedelta(days=1)
-        while current_date.weekday() >= 5:
+        while not is_working_day(current_date):
             current_date += timedelta(days=1)
 
 # Inicializar session_state
+if 'blocked_days' not in st.session_state:
+    st.session_state.blocked_days = []
+    load_blocked_days()
+
 if 'parts' not in st.session_state:
     st.session_state.parts = []
     load_parts_from_file()
@@ -193,20 +229,24 @@ if 'loaded' not in st.session_state:
     st.session_state.loaded = False
     load_from_file()
 
-def calculate_next_available_date():
+def calculate_next_available_date(custom_start=None):
     """Calcula a próxima data disponível baseada nos pedidos existentes"""
-    if not st.session_state.orders:
+    if custom_start:
+        # Se há uma data customizada, usa ela
+        current_date = custom_start
+    elif not st.session_state.orders:
+        # Se não há pedidos, começa hoje
         current_date = datetime.now()
-        while current_date.weekday() >= 5:
-            current_date += timedelta(days=1)
-        return current_date
+    else:
+        # Pega a última data de término
+        last_end_date = max(order['end_date'] for order in st.session_state.orders)
+        current_date = last_end_date + timedelta(days=1)
     
-    last_end_date = max(order['end_date'] for order in st.session_state.orders)
-    next_date = last_end_date + timedelta(days=1)
-    while next_date.weekday() >= 5:
-        next_date += timedelta(days=1)
+    # Avançar para o próximo dia útil
+    while not is_working_day(current_date):
+        current_date += timedelta(days=1)
     
-    return next_date
+    return current_date
 
 def calculate_end_date(start_date, total_minutes, workers, effective_minutes):
     """Calcula a data de término baseado na capacidade efetiva"""
@@ -218,7 +258,7 @@ def calculate_end_date(start_date, total_minutes, workers, effective_minutes):
     
     while work_days < days_needed:
         current_date += timedelta(days=1)
-        if current_date.weekday() < 5:
+        if is_working_day(current_date):
             work_days += 1
     
     return current_date, days_needed
@@ -228,7 +268,10 @@ def create_month_calendar(month_date, orders):
     year = month_date.year
     month = month_date.month
     
-    cal = calendar.monthcalendar(year, month)
+    # Usar calendar.Calendar para obter o mês com semanas completas
+    cal = calendar.Calendar(firstweekday=6)  # Começa no domingo
+    month_days = cal.monthdatescalendar(year, month)
+    
     month_name = month_date.strftime('%B de %Y').capitalize()
     
     html = f'<div style="margin: 20px; padding: 15px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">'
@@ -240,14 +283,16 @@ def create_month_calendar(month_date, orders):
         html += f'<th style="padding: 10px; background: #e0e0e0; border: 1px solid #ccc; font-weight: bold;">{day}</th>'
     html += '</tr>'
     
-    for week in cal:
+    for week in month_days:
         html += '<tr>'
-        for day in week:
-            if day == 0:
-                html += '<td style="padding: 15px; border: 1px solid #ccc;"></td>'
+        for current_date in week:
+            # Se o dia não pertence ao mês atual, deixa vazio
+            if current_date.month != month:
+                html += '<td style="padding: 15px; border: 1px solid #ccc; background: #f5f5f5;"></td>'
             else:
-                current_date = datetime(year, month, day)
+                day = current_date.day
                 is_weekend = current_date.weekday() >= 5
+                is_blocked = current_date in st.session_state.blocked_days
                 
                 is_start = False
                 is_end = False
@@ -255,13 +300,13 @@ def create_month_calendar(month_date, orders):
                 order_names = []
                 
                 for idx, order in enumerate(orders):
-                    if order['start_date'].date() == current_date.date():
+                    if order['start_date'].date() == current_date:
                         is_start = True
                         order_names.append(f"#{idx+1}")
-                    if order['end_date'].date() == current_date.date():
+                    if order['end_date'].date() == current_date:
                         is_end = True
-                    if order['start_date'].date() <= current_date.date() <= order['end_date'].date():
-                        if current_date.weekday() < 5:
+                    if order['start_date'].date() <= current_date <= order['end_date'].date():
+                        if is_working_day(datetime.combine(current_date, datetime.min.time())):
                             has_production = True
                 
                 if is_start:
@@ -272,7 +317,10 @@ def create_month_calendar(month_date, orders):
                 elif is_end:
                     bg_color = '#ffcdd2'
                     text = f'{day} 🔴'
-                elif has_production and not is_weekend:
+                elif is_blocked:
+                    bg_color = '#ffeb3b'
+                    text = f'{day} 🚫'
+                elif has_production and not is_weekend and not is_blocked:
                     bg_color = '#bbdefb'
                     text = str(day)
                 elif is_weekend:
@@ -293,7 +341,7 @@ def create_month_calendar(month_date, orders):
 st.title("📦 Sistema de Agendamento de Produção")
 
 # Abas principais
-tab1, tab2, tab3 = st.tabs(["🏭 Produção", "🔧 Cadastro de Peças", "📊 Relatórios"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏭 Produção", "🔧 Cadastro de Peças", "📅 Dias Bloqueados", "📊 Relatórios"])
 
 # ===== ABA 1: PRODUÇÃO =====
 with tab1:
@@ -307,12 +355,13 @@ with tab1:
             st.caption("💾 Nenhum histórico salvo ainda")
     
     with col_info2:
-        st.caption(f"📋 Pedidos: {len(st.session_state.orders)} | Peças cadastradas: {len(st.session_state.parts)}")
+        st.caption(f"📋 Pedidos: {len(st.session_state.orders)} | Peças: {len(st.session_state.parts)} | Bloqueados: {len(st.session_state.blocked_days)}")
     
     with col_info3:
         if st.button("🔄 Recarregar"):
             load_from_file()
             load_parts_from_file()
+            load_blocked_days()
             st.success("✅ Dados recarregados!")
             st.rerun()
     
@@ -375,7 +424,18 @@ with tab1:
         if not st.session_state.parts:
             st.warning("⚠️ Cadastre peças primeiro na aba 'Cadastro de Peças'!")
         else:
-            order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
+            col_name, col_date = st.columns([2, 1])
+            
+            with col_name:
+                order_name = st.text_input("📝 Nome do Pedido", placeholder="Ex: Pedido #123")
+            
+            with col_date:
+                # Campo para definir data de início personalizada
+                custom_start_date = st.date_input(
+                    "📅 Data de Início",
+                    value=calculate_next_available_date().date(),
+                    help="Defina a data de início deste pedido"
+                )
             
             st.subheader("Adicionar Itens ao Pedido")
             
@@ -427,27 +487,28 @@ with tab1:
                 total_minutes = sum(item['total_time'] for item in st.session_state.temp_items)
                 st.info(f"⏱️ **Total do Pedido: {total_minutes} minutos ({total_minutes/60:.1f} horas)**")
                 
-                next_date = calculate_next_available_date()
-                st.info(f"📅 **Data de Início: {next_date.strftime('%d/%m/%Y')}**")
+                # Calcular data de término baseado na data customizada
+                start_datetime = datetime.combine(custom_start_date, datetime.min.time())
+                effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
+                end_date, days_needed = calculate_end_date(
+                    start_datetime,
+                    total_minutes,
+                    st.session_state.workers,
+                    effective_minutes
+                )
+                
+                st.info(f"📅 **Início: {start_datetime.strftime('%d/%m/%Y')} | Fim: {end_date.strftime('%d/%m/%Y')} | Dias úteis: {days_needed}**")
                 
                 if st.button("✅ Finalizar e Adicionar Pedido", type="primary"):
                     if not order_name:
                         st.error("❌ Insira o nome do pedido!")
                     else:
-                        effective_minutes = st.session_state.minutes_per_day * (st.session_state.efficiency / 100)
-                        end_date, days_needed = calculate_end_date(
-                            next_date,
-                            total_minutes,
-                            st.session_state.workers,
-                            effective_minutes
-                        )
-                        
                         order = {
                             'id': len(st.session_state.orders) + 1,
                             'name': order_name,
                             'items': st.session_state.temp_items.copy(),
                             'total_minutes': total_minutes,
-                            'start_date': next_date,
+                            'start_date': start_datetime,
                             'end_date': end_date,
                             'days_needed': days_needed
                         }
@@ -467,7 +528,7 @@ with tab1:
             # Reordenação
             if len(st.session_state.orders) > 1:
                 st.subheader("🔄 Reordenar Prioridades")
-                col1, col2, col3 = st.columns([3, 1, 1])
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 2])
                 
                 with col1:
                     order_to_move = st.selectbox(
@@ -481,7 +542,9 @@ with tab1:
                         if st.button("⬆️ Subir"):
                             st.session_state.orders[order_to_move], st.session_state.orders[order_to_move-1] = \
                                 st.session_state.orders[order_to_move-1], st.session_state.orders[order_to_move]
-                            recalculate_all_dates()
+                            # Manter a data de início do primeiro pedido
+                            first_start = st.session_state.orders[0]['start_date']
+                            recalculate_all_dates(first_start)
                             save_to_file()
                             st.rerun()
                 
@@ -490,9 +553,20 @@ with tab1:
                         if st.button("⬇️ Descer"):
                             st.session_state.orders[order_to_move], st.session_state.orders[order_to_move+1] = \
                                 st.session_state.orders[order_to_move+1], st.session_state.orders[order_to_move]
-                            recalculate_all_dates()
+                            # Manter a data de início do primeiro pedido
+                            first_start = st.session_state.orders[0]['start_date']
+                            recalculate_all_dates(first_start)
                             save_to_file()
                             st.rerun()
+                
+                with col4:
+                    if st.button("🔄 Recalcular Todas as Datas"):
+                        # Manter a data de início do primeiro pedido
+                        first_start = st.session_state.orders[0]['start_date']
+                        recalculate_all_dates(first_start)
+                        save_to_file()
+                        st.success("✅ Datas recalculadas!")
+                        st.rerun()
             
             # Lista de pedidos
             for idx, order in enumerate(st.session_state.orders):
@@ -508,7 +582,9 @@ with tab1:
                     
                     if st.button(f"🗑️ Remover Pedido", key=f"rem_{idx}"):
                         st.session_state.orders.pop(idx)
-                        recalculate_all_dates()
+                        if st.session_state.orders:
+                            first_start = st.session_state.orders[0]['start_date']
+                            recalculate_all_dates(first_start)
                         save_to_file()
                         st.rerun()
             
@@ -516,6 +592,19 @@ with tab1:
             
             # Calendário
             st.header("📅 Calendário")
+            
+            # Legenda
+            col_leg1, col_leg2, col_leg3, col_leg4, col_leg5 = st.columns(5)
+            with col_leg1:
+                st.markdown("🟢 **Início**")
+            with col_leg2:
+                st.markdown("📦 **Produção**")
+            with col_leg3:
+                st.markdown("🔴 **Fim**")
+            with col_leg4:
+                st.markdown("🚫 **Bloqueado**")
+            with col_leg5:
+                st.markdown("⬜ **Weekend**")
             
             all_dates = [o['start_date'] for o in st.session_state.orders] + [o['end_date'] for o in st.session_state.orders]
             min_date = min(all_dates)
@@ -527,7 +616,10 @@ with tab1:
             months = []
             while current <= end:
                 months.append(current)
-                current = datetime(current.year + (current.month // 12), (current.month % 12) + 1, 1)
+                if current.month == 12:
+                    current = datetime(current.year + 1, 1, 1)
+                else:
+                    current = datetime(current.year, current.month + 1, 1)
             
             for month_date in months:
                 st.markdown(create_month_calendar(month_date, st.session_state.orders), unsafe_allow_html=True)
@@ -559,76 +651,4 @@ with tab2:
             part = {
                 'name': part_name,
                 'reference': part_ref,
-                'time_minutes': part_time,
-                'production_order': part_order
-            }
-            st.session_state.parts.append(part)
-            save_parts_to_file()
-            st.success(f"✅ Peça '{part_name}' cadastrada!")
-            st.rerun()
-    
-    st.markdown("---")
-    
-    if st.session_state.parts:
-        st.subheader("Peças Cadastradas")
-        
-        df_parts = pd.DataFrame(st.session_state.parts)
-        st.dataframe(df_parts, use_container_width=True, hide_index=True)
-        
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            part_to_remove = st.selectbox(
-                "Remover:",
-                range(len(st.session_state.parts)),
-                format_func=lambda x: st.session_state.parts[x]['reference']
-            )
-        with col2:
-            if st.button("🗑️ Remover Peça"):
-                st.session_state.parts.pop(part_to_remove)
-                save_parts_to_file()
-                st.success("✅ Peça removida!")
-                st.rerun()
-    else:
-        st.info("📦 Nenhuma peça cadastrada ainda.")
-
-# ===== ABA 3: RELATÓRIOS =====
-with tab3:
-    st.header("📊 Relatórios e Exportações")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📥 Exportar Pedidos")
-        csv_orders = export_orders_to_csv()
-        if csv_orders:
-            st.download_button(
-                "📥 Download Pedidos (CSV)",
-                csv_orders,
-                f"pedidos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                "text/csv"
-            )
-        else:
-            st.info("Nenhum pedido para exportar")
-    
-    with col2:
-        st.subheader("📥 Exportar Peças")
-        csv_parts = export_parts_to_csv()
-        if csv_parts:
-            st.download_button(
-                "📥 Download Peças (CSV)",
-                csv_parts,
-                f"pecas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                "text/csv"
-            )
-        else:
-            st.info("Nenhuma peça para exportar")
-
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: gray;'>
-        <p>Sistema de Agendamento de Produção v5.0 🚀</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                'time_minutes': part_time
