@@ -3,7 +3,7 @@
         "workers": 32,
         "minutes_per_day": 480,
         "efficiency": 75,
-        "config_saved": true
+        "config_saved": false
     },
     "orders": [
         {
