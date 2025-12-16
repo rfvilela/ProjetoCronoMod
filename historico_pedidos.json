@@ -1,9 +1,9 @@
 {
     "config": {
         "workers": 32,
-        "minutes_per_day": 480,
+        "minutes_per_day": 483,
         "efficiency": 75,
-        "config_saved": false
+        "config_saved": true
     },
     "orders": [
         {
