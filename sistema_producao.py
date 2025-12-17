@@ -87,6 +87,20 @@ def is_working_day(date):
         return False
     return True
 
+def calculate_end_date(start_date, total_minutes, workers, effective_minutes):
+    daily_capacity = workers * effective_minutes
+    days_needed = int((total_minutes + daily_capacity - 1) // daily_capacity)
+    
+    current_date = start_date
+    work_days = 0
+    
+    while work_days < days_needed:
+        current_date += timedelta(days=1)
+        if is_working_day(current_date):
+            work_days += 1
+    
+    return current_date, days_needed
+
 def calculate_next_available_date(custom_start=None):
     if custom_start:
         current_date = custom_start
